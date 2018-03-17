@@ -1,7 +1,10 @@
-import { h, Component } from 'preact';
+import { Component } from 'preact';
 import { route } from 'preact-router';
+import jsxReplace from '../../lib/jsx-replace';
 import cx from 'classnames';
 import wire from 'wiretie';
+import Field from './field';
+import Simplified from './simplified';
 import style from './style';
 
 const DEFAULTS = {
@@ -11,7 +14,7 @@ const DEFAULTS = {
 function getQuery(matches, githubProfile) {
 	let query = {};
 	if (githubProfile) {
-		query.organization = githubProfile.name;
+		query.organization = githubProfile.name || githubProfile.login;
 	}
 	for (let i in Object(matches)) {
 		if (matches.hasOwnProperty(i) && i!=='licenseId') {
@@ -21,24 +24,6 @@ function getQuery(matches, githubProfile) {
 	return query;
 }
 
-function jsxReplace(str, pattern, callback) {
-	if (Array.isArray(str)) return str.concat.apply([], str.map( str => jsxReplace(str, pattern, callback) ));
-	if (typeof str!=='string') return str;
-	let out = [],
-		index = pattern.lastIndex = 0,
-		match;
-	while ((match=pattern.exec(str))) {
-		if (match.index>index) {
-			out.push(str.substring(index, match.index));
-		}
-		out.push(callback.apply(null, match));
-		index = pattern.lastIndex;
-	}
-	if (index<str.length) {
-		out.push(str.substring(index));
-	}
-	return out;
-}
 
 @wire('model', ({ licenseId, gh }) => ({
 	license: licenseId && ['getLicense', licenseId],
@@ -84,6 +69,10 @@ export default class License extends Component {
 		}, 250);
 	};
 
+	componentWillUnmount() {
+		clearTimeout(this.routeTimer);
+	}
+
 	render({ licenseId, license, pending, error, matches, githubProfile }) {
 		let query = getQuery(matches, githubProfile);
 
@@ -91,40 +80,12 @@ export default class License extends Component {
 			<div class={cx(style.license, pending && style.loading)}>
 				<section>
 					<h1>{license && license.info && license.info.name || licenseId} License</h1>
-					
 					<article>
+						<Simplified licenseId={licenseId} />
 						{license && this.format(license.text, query)}
 					</article>
 				</section>
 			</div>
-		);
-	}
-}
-
-
-class Field extends Component {
-	state = {
-		value: this.props.value
-	};
-
-	handleChange = e => {
-		let { id, value, onChange } = this.props;
-		if (e.target.value===value) return;
-		value = e.target.value;
-		this.setState({ value });
-		onChange({ id, value });
-	};
-
-	componentWillReceiveProps({ value }) {
-		if (value!==this.state.value) this.setState({ value });
-	}
-
-	render({ id }, { value }) {
-		return (
-			<span class={style.field}>
-				<span class={style.value}>{value || id}&nbsp;</span>
-				<input type="text" class={style.input} onInput={this.handleChange} value={value} placeholder={id} />
-			</span>
 		);
 	}
 }
